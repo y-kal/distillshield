@@ -1,0 +1,43 @@
+DistillShield Local Run Guide
+
+1. Create and activate the Python environment
+   python3 -m venv .venv
+   source .venv/bin/activate
+
+2. Upgrade pip and install Python dependencies
+   python -m pip install --upgrade pip
+   python -m pip install -e .[dev]
+
+3. Install frontend dependencies
+   cd apps/web
+   npm install
+   cd ../..
+
+4. Generate synthetic data and initialize the SQLite database
+   python scripts/generate_synthetic.py
+
+5. Train the baseline models
+   python scripts/train_baseline.py
+
+6. Start the backend API
+   uvicorn distillshield_api.main:app --reload --host 0.0.0.0 --port 8000
+
+7. Start the frontend dashboard in a second terminal
+   source .venv/bin/activate
+   cd apps/web
+   npm run dev -- --host 0.0.0.0 --port 5173
+
+8. Open the local research dashboard
+   http://localhost:5173
+
+9. Run evaluation
+   source .venv/bin/activate
+   python scripts/evaluate.py
+
+10. Run tests
+    source .venv/bin/activate
+    pytest -q
+
+11. Useful API endpoints
+    http://localhost:8000/docs
+    http://localhost:8000/health

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "distillshield"
+version = "0.1.0"
+description = "Local-first research prototype for adaptive output protection against LLM distillation"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "sqlmodel>=0.0.22",
+  "sqlalchemy>=2.0",
+  "pandas>=2.2",
+  "numpy>=1.26",
+  "scikit-learn>=1.5",
+  "joblib>=1.4",
+  "lightgbm>=4.5",
+  "python-dotenv>=1.0",
+  "networkx>=3.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "httpx>=0.27",
+]
+sequence = [
+  "torch>=2.4",
+]
+
+[tool.setuptools]
+packages = [
+  "distillshield_api",
+  "distillshield_core",
+  "distillshield_storage",
+  "distillshield_synthetic_data",
+  "distillshield_feature_pipeline",
+  "distillshield_models",
+  "distillshield_llm_adapter",
+  "distillshield_eval",
+]
+
+[tool.setuptools.package-dir]
+distillshield_api = "apps/api/distillshield_api"
+distillshield_core = "packages/core/src/distillshield_core"
+distillshield_storage = "packages/storage/src/distillshield_storage"
+distillshield_synthetic_data = "packages/synthetic_data/src/distillshield_synthetic_data"
+distillshield_feature_pipeline = "packages/feature_pipeline/src/distillshield_feature_pipeline"
+distillshield_models = "packages/models/src/distillshield_models"
+distillshield_llm_adapter = "packages/llm_adapter/src/distillshield_llm_adapter"
+distillshield_eval = "packages/eval/src/distillshield_eval"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "apps/api",
+  "packages/core/src",
+  "packages/storage/src",
+  "packages/synthetic_data/src",
+  "packages/feature_pipeline/src",
+  "packages/models/src",
+  "packages/llm_adapter/src",
+  "packages/eval/src",
+]
+testpaths = ["tests"]
