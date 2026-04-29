@@ -13,7 +13,7 @@ venv:
 
 install: venv
 	$(PIP) install --upgrade pip
-	$(PIP) install -e .
+	$(PIP) install -e .[dev]
 	cd apps/web && $(NPM) install
 
 api:

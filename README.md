@@ -1,6 +1,6 @@
 # DistillShield
 
-DistillShield is a local-first, rule-based adaptive output protection prototype for reducing model-distillation leakage risk by changing the level of reasoning exposed to users based on behavioural risk signals.
+DistillShield is a local-first, rules-only adaptive output protection prototype for reducing model-distillation leakage risk by changing the level of reasoning exposed to users based on behavioural risk signals.
 
 ## What the prototype includes
 - Synthetic scenario generation for `normal`, `laboratory_legitimate`, `suspicious`, and `high_threat`
@@ -29,15 +29,26 @@ Repository layout:
 - `docs`: implementation notes and limitations
 - `tests`: unit and integration coverage
 
-## Setup
-1. Create the virtual environment.
-2. Install Python dependencies in editable mode.
-3. Install dashboard dependencies.
-4. Generate scenario data if you want a seeded demo database.
-5. Start the API and dashboard.
-6. Run policy-effectiveness evaluation when needed.
+## Local Run Flow
+1. `python3 -m venv .venv`
+2. `source .venv/bin/activate`
+3. `python -m pip install --upgrade pip`
+4. `python -m pip install -e .[dev]`
+5. `cd apps/web && npm install && cd ../..`
+6. `python scripts/generate_scenarios.py`
+7. `python scripts/evaluate.py`
+8. `uvicorn distillshield_api.main:app --reload --host 0.0.0.0 --port 8000`
+9. `cd apps/web && npm run dev -- --host 0.0.0.0 --port 5173`
 
-Exact commands are in [RUN_INSTRUCTIONS.txt](/home/ykal/College/cf_ds/RUN_INSTRUCTIONS.txt).
+The same commands are listed in [RUN_INSTRUCTIONS.txt](/home/ykal/College/cf_ds/RUN_INSTRUCTIONS.txt).
+
+## Makefile Shortcuts
+- `make install`
+- `make generate`
+- `make evaluate`
+- `make api`
+- `make web`
+- `make test`
 
 ## Scenario Generation And Evaluation
 - `scripts/generate_scenarios.py` creates reproducible synthetic scenario sessions for demo, evaluation, and dashboard inspection.
@@ -103,7 +114,7 @@ Mocked or heuristic:
 - heuristic infrastructure abuse indicators
 - leakage and utility proxies
 
-The system does not train an LLM and does not train ML classifiers. Synthetic data is only used for scenario simulation, demo flows, and evaluation of the protection mechanics.
+The system is rules-only. It does not train an LLM or baseline ML classifiers.
 
 ## Limitations
 This is a research prototype. It demonstrates feasibility mechanics, not production-grade abuse detection or proven resistance against real model distillation. See [docs/limitations.md](/home/ykal/College/cf_ds/docs/limitations.md).
