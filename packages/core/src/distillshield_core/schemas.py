@@ -62,14 +62,34 @@ class ScoreExplanation(BaseModel):
     contribution: float
 
 
+class TriggeredRule(BaseModel):
+    id: str
+    description: str
+    effect: str
+
+
+class AssessmentExplainability(BaseModel):
+    risk_score: float
+    predicted_class: BehaviorClass
+    confidence: float
+    category_scores: dict[str, float] = Field(default_factory=dict)
+    risk_reducers: list[str] = Field(default_factory=list)
+    top_reasons: list[str] = Field(default_factory=list)
+    triggered_rules: list[TriggeredRule] = Field(default_factory=list)
+
+
 class RiskAssessmentResult(BaseModel):
     session_id: str
     risk_score: float
     predicted_class: BehaviorClass
     confidence: float
-    reasons: list[ScoreExplanation]
+    explainability: AssessmentExplainability
+    category_scores: dict[str, float] = Field(default_factory=dict)
+    top_reasons: list[str] = Field(default_factory=list)
+    triggered_rules: list[TriggeredRule] = Field(default_factory=list)
+    risk_reducers: list[str] = Field(default_factory=list)
+    reasons: list[ScoreExplanation] = Field(default_factory=list)
     feature_values: list[FeatureValue]
-    model_contributions: dict[str, float] = Field(default_factory=dict)
 
 
 class PolicyDecisionResult(BaseModel):
@@ -96,12 +116,6 @@ class SimulationRequest(BaseModel):
     persist: bool = True
 
 
-class TrainingRequest(BaseModel):
-    seed: int = 7
-    num_users: int = 60
-    sessions_per_user: int = 4
-
-
 class EvaluateRequest(BaseModel):
     seed: int = 11
     num_users: int = 40
@@ -112,22 +126,19 @@ class IngestSessionRequest(BaseModel):
     session: SessionRecord
 
 
-class ModelSummary(BaseModel):
-    name: str
-    available: bool
-    version: str
-    metrics: dict[str, float] = Field(default_factory=dict)
-
-
 class ExperimentMetrics(BaseModel):
-    accuracy: float | None = None
-    precision: float | None = None
-    recall: float | None = None
-    f1: float | None = None
-    utility_mean: float | None = None
-    leakage_proxy_mean: float | None = None
-    confusion_matrix: list[list[float]] | None = None
-    class_report: dict[str, Any] | None = None
+    scenario_count: int | None = None
+    mean_risk_score: float | None = None
+    leakage_proxy_reduction_mean: float | None = None
+    utility_preservation_mean: float | None = None
+    false_block_rate_normal: float | None = None
+    false_block_rate_laboratory_legitimate: float | None = None
+    adaptive_degradation_rate_high_risk: float | None = None
+    reason_coverage: float | None = None
+    threshold_sanity_checks: dict[str, float] = Field(default_factory=dict)
+    policy_distribution_by_class: dict[str, dict[str, int]] = Field(default_factory=dict)
+    leakage_proxy_reduction_by_class: dict[str, float] = Field(default_factory=dict)
+    utility_preservation_by_class: dict[str, float] = Field(default_factory=dict)
 
 
 class ExperimentSummary(BaseModel):

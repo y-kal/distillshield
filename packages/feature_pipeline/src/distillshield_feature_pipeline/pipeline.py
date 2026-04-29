@@ -67,6 +67,10 @@ class FeaturePipeline:
         prior_refs = 0
         question_forms = 0
         emotional_context = 0
+        reasoning_requests = 0
+        structured_harvest_requests = 0
+        template_constraints = 0
+        research_context = 0
         verb_counter: Counter[str] = Counter()
         typo_scores = []
         domains = []
@@ -84,6 +88,14 @@ class FeaturePipeline:
                 question_forms += 1
             if any(marker in lower for marker in ["i am", "my project", "i feel", "for my class", "beginner"]):
                 emotional_context += 1
+            if any(marker in lower for marker in ["step by step", "chain-of-thought", "full steps", "procedural reasoning", "numbered reasoning"]):
+                reasoning_requests += 1
+            if any(marker in lower for marker in ["dataset-ready", "do not omit reasoning", "avoid omissions", "comprehensive tutorial", "structured but non-exhaustive"]):
+                structured_harvest_requests += 1
+            if any(marker in lower for marker in ["identical format", "keep the structure identical", "reusable template", "consistent format"]):
+                template_constraints += 1
+            if any(marker in lower for marker in ["research benchmark", "for evaluation purposes", "for a class project", "for my class", "educational"]):
+                research_context += 1
             words = self._tokenize(text)
             verb_counter.update(set(words) & VERB_HINTS)
             typo_scores.append(self._typo_proxy(text))
@@ -123,6 +135,9 @@ class FeaturePipeline:
             "session_restart_frequency": restart_frequency,
             "context_window_utilisation_proxy": self._safe_ratio(sum(query_lengths), 3000.0),
             "clarification_request_rate": clarification_requests / max(len(texts), 1),
+            "reasoning_request_intensity": reasoning_requests / max(len(texts), 1),
+            "structured_harvest_score": structured_harvest_requests / max(len(texts), 1),
+            "template_constraint_score": template_constraints / max(len(texts), 1),
             "inter_query_time_mean": mean(gaps),
             "inter_query_time_std": pstdev(gaps) if len(gaps) > 1 else 0.0,
             "burst_regularity_proxy": 1.0 - min((pstdev(gaps) if len(gaps) > 1 else 0.0) / (mean(gaps) + 1.0), 1.0),
@@ -141,6 +156,7 @@ class FeaturePipeline:
             "reference_to_prior_response_rate": prior_refs / max(len(texts), 1),
             "domain_coverage_breadth": len(set(domains)),
             "instruction_verb_diversity": len(verb_counter),
+            "research_context_score": research_context / max(len(texts), 1),
             "emotional_personal_context_presence": emotional_context / max(len(texts), 1),
             "typo_grammar_noisiness_proxy": mean(typo_scores) if typo_scores else 0.0,
             "question_form_rate": question_forms / max(len(texts), 1),

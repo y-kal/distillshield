@@ -68,8 +68,12 @@ class RiskAssessmentEntity(SQLModel, table=True):
     risk_score: float
     predicted_class: str = Field(index=True)
     confidence: float
+    explainability: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    category_scores: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    top_reasons: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    triggered_rules: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    risk_reducers: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     reasons: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
-    model_contributions: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime
 
 
@@ -100,12 +104,3 @@ class ExperimentRunEntity(SQLModel, table=True):
     metrics: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     artifact_paths: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     notes: str | None = None
-
-
-class ModelVersionEntity(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    version: str
-    artifact_path: str
-    metrics: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
-    created_at: datetime

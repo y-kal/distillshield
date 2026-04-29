@@ -18,3 +18,8 @@ def test_feature_pipeline_extracts_requested_features():
     assert "key_rotation_frequency" in feature_names
     assert "question_form_rate" in feature_names
     assert len(features) >= 30
+
+
+def test_scenario_batches_group_generated_sessions_by_class():
+    grouped = SyntheticDataGenerator(seed=7).scenario_batches(num_users=4, sessions_per_user=1)
+    assert set(grouped) == {"normal", "laboratory_legitimate", "suspicious", "high_threat"}

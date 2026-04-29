@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { fetchJson, postJson } from "./api";
 
-const emptyFilters = { label: "", policy: "", confidence: "" };
+const emptyFilters = { label: "" };
+
+const CLASS_TONE = {
+  normal: "safe",
+  laboratory_legitimate: "controlled",
+  suspicious: "elevated",
+  high_threat: "severe",
+};
 
 export default function App() {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [models, setModels] = useState([]);
   const [experiment, setExperiment] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [error, setError] = useState("");
@@ -24,13 +30,11 @@ export default function App() {
 
   async function refresh() {
     try {
-      const [sessionData, modelData, latestExperiment] = await Promise.all([
+      const [sessionData, latestExperiment] = await Promise.all([
         fetchJson("/sessions"),
-        fetchJson("/models"),
         fetchJson("/experiments/latest"),
       ]);
       setSessions(sessionData);
-      setModels(modelData);
       setExperiment(latestExperiment);
       if (sessionData.length && !selectedId) {
         setSelectedId(sessionData[0].id);
@@ -43,7 +47,6 @@ export default function App() {
   async function generateDemo() {
     try {
       await postJson("/simulate/session", { num_users: 12, sessions_per_user: 2, seed: 7, persist: true });
-      await postJson("/train/baseline", { seed: 7, num_users: 40, sessions_per_user: 3 });
       await postJson("/evaluate", { seed: 11, num_users: 24, sessions_per_user: 2 });
       await refresh();
     } catch (err) {
@@ -62,13 +65,13 @@ export default function App() {
         <div className="brand">
           <p className="eyebrow">Local Research Prototype</p>
           <h1>DistillShield</h1>
-          <p className="lede">Adaptive output protection against LLM distillation.</p>
+          <p className="lede">Rule-based adaptive output protection for reasoning leakage risk.</p>
         </div>
-        <button className="primary" onClick={generateDemo}>Generate Demo Data</button>
+        <button className="primary" onClick={generateDemo}>Generate Demo Scenarios</button>
         <button className="secondary" onClick={refresh}>Refresh</button>
         <div className="filters">
           <label>
-            Class
+            Behaviour class
             <select value={filters.label} onChange={(event) => setFilters({ ...filters, label: event.target.value })}>
               <option value="">All</option>
               <option value="normal">normal</option>
@@ -86,6 +89,7 @@ export default function App() {
               onClick={() => setSelectedId(session.id)}
             >
               <strong>{session.label || "unknown"}</strong>
+              <span>{CLASS_TONE[session.label] || "unclassified"}</span>
               <span>{session.user_id}</span>
               <span>{new Date(session.started_at).toLocaleString()}</span>
             </button>
@@ -95,23 +99,21 @@ export default function App() {
       <main className="main-panel">
         {error ? <div className="error">{error}</div> : null}
         <section className="top-grid">
-          <Card title="Latest Experiment">
+          <Card title="Latest Evaluation">
             {experiment ? (
               <div>
                 <p><strong>{experiment.experiment_id}</strong></p>
-                <Metric label="Accuracy" value={experiment.metrics.accuracy} />
-                <Metric label="F1" value={experiment.metrics.f1} />
-                <Metric label="Leakage" value={experiment.metrics.leakage_proxy_mean} />
+                <Metric label="Scenario count" value={experiment.metrics.scenario_count} />
+                <Metric label="Mean risk score" value={experiment.metrics.mean_risk_score} />
+                <Metric label="Leakage reduction" value={experiment.metrics.leakage_proxy_reduction_mean} />
+                <Metric label="Utility preservation" value={experiment.metrics.utility_preservation_mean} />
               </div>
-            ) : <p>No experiment run yet.</p>}
+            ) : <p>No evaluation run yet.</p>}
           </Card>
-          <Card title="Models">
-            {models.length ? models.map((model) => (
-              <div key={model.name} className="metric-row">
-                <span>{model.name}</span>
-                <span>{model.metrics.f1?.toFixed?.(3) ?? "n/a"}</span>
-              </div>
-            )) : <p>No trained models.</p>}
+          <Card title="Rule Engine">
+            <p><strong>Model:</strong> Grouped rule-based risk engine</p>
+            <p><strong>Decision flow:</strong> category scores, escalation rules, policy engine, protected output</p>
+            <p><strong>Confidence:</strong> derived from rule agreement, not ML probabilities</p>
           </Card>
         </section>
 
@@ -119,8 +121,8 @@ export default function App() {
           <Card title="Session Detail">
             {detail ? <SessionDetail detail={detail} /> : <p>Select a session.</p>}
           </Card>
-          <Card title="Features / Risk / Transformation">
-            {detail ? <AssessmentDetail detail={detail} /> : <p>Score a session through the API to populate this view.</p>}
+          <Card title="Assessment Detail">
+            {detail ? <AssessmentDetail detail={detail} /> : <p>Select a session to inspect its assessment.</p>}
           </Card>
         </section>
       </main>
@@ -151,7 +153,7 @@ function SessionDetail({ detail }) {
     <div className="stack">
       <p><strong>Session:</strong> {detail.session.id}</p>
       <p><strong>User:</strong> {detail.session.user_id}</p>
-      <p><strong>Label:</strong> {detail.session.label || "unknown"}</p>
+      <p><strong>Scenario label:</strong> {detail.session.label || "unknown"}</p>
       <p><strong>Org:</strong> {detail.api_context?.org_id}</p>
       <p><strong>Source:</strong> {detail.api_context?.source}</p>
       <h3>Queries</h3>
@@ -167,20 +169,54 @@ function SessionDetail({ detail }) {
 
 function AssessmentDetail({ detail }) {
   const featureItems = Object.values(detail.features?.feature_payload || {});
+  const risk = detail.risk_assessment;
+  const policy = detail.policy_decision;
+  const transformation = detail.transformation;
+  const categoryScores = risk?.category_scores || {};
+
   return (
     <div className="stack">
-      <p><strong>Risk score:</strong> {detail.risk_assessment?.risk_score ?? "n/a"}</p>
-      <p><strong>Predicted class:</strong> {detail.risk_assessment?.predicted_class ?? "n/a"}</p>
-      <p><strong>Confidence:</strong> {detail.risk_assessment?.confidence ?? "n/a"}</p>
-      <p><strong>Policy:</strong> {detail.policy_decision?.chosen_policy ?? "n/a"}</p>
-      <p><strong>Leakage proxy:</strong> {detail.transformation?.leakage_proxy_score ?? "n/a"}</p>
-      <h3>Reasons</h3>
-      {(detail.risk_assessment?.reasons || []).map((reason, index) => (
-        <div key={index} className="metric-row">
-          <span>{reason.reason}</span>
-          <strong>{reason.contribution}</strong>
+      <div className={`status-banner ${CLASS_TONE[risk?.predicted_class] || "safe"}`}>
+        <strong>{risk?.predicted_class || "unclassified"}</strong>
+        <span>{CLASS_TONE[risk?.predicted_class] || "status unavailable"}</span>
+      </div>
+      <p><strong>Risk score:</strong> {risk?.risk_score ?? "n/a"}</p>
+      <p><strong>Risk confidence:</strong> {risk?.confidence ?? "n/a"}</p>
+      <p><strong>Policy decision:</strong> {policy?.chosen_policy ?? "n/a"}</p>
+      <p><strong>Policy reason:</strong> {policy?.policy_reason ?? "n/a"}</p>
+      <p><strong>Leakage proxy:</strong> {transformation?.leakage_proxy_score ?? "n/a"}</p>
+
+      <h3>Category Scores</h3>
+      {["query_pattern", "reasoning_extraction", "automation", "infrastructure", "legitimate_use"].map((name) => (
+        <div key={name} className="metric-row">
+          <span>{name}</span>
+          <strong>{typeof categoryScores[name] === "number" ? categoryScores[name].toFixed(3) : "n/a"}</strong>
         </div>
       ))}
+
+      <h3>Top Reasons</h3>
+      {(risk?.top_reasons || []).length ? (risk.top_reasons.map((reason, index) => (
+        <div key={index} className="query-block compact">
+          {reason}
+        </div>
+      ))) : <p>No top reasons available.</p>}
+
+      <h3>Triggered Rules</h3>
+      {(risk?.triggered_rules || []).length ? (risk.triggered_rules.map((rule) => (
+        <div key={rule.id} className="query-block compact">
+          <strong>{rule.id}</strong>
+          <p>{rule.description}</p>
+          <small>{rule.effect}</small>
+        </div>
+      ))) : <p>No escalation rules triggered.</p>}
+
+      <h3>Risk Reducers</h3>
+      {(risk?.risk_reducers || []).length ? (risk.risk_reducers.map((item, index) => (
+        <div key={index} className="query-block compact">
+          {item}
+        </div>
+      ))) : <p>No explicit risk reducers recorded.</p>}
+
       <h3>Feature Values</h3>
       <div className="feature-list">
         {featureItems.map((feature) => (
@@ -191,15 +227,16 @@ function AssessmentDetail({ detail }) {
           </div>
         ))}
       </div>
+
       <h3>Outputs</h3>
       <div className="output-grid">
         <div>
-          <h4>Raw teacher output</h4>
-          <pre>{detail.transformation?.raw_output || "Not generated yet."}</pre>
+          <h4>Mock teacher output</h4>
+          <pre>{transformation?.raw_output || "Not generated yet."}</pre>
         </div>
         <div>
-          <h4>Transformed output</h4>
-          <pre>{detail.transformation?.transformed_output || "Not generated yet."}</pre>
+          <h4>Protected output</h4>
+          <pre>{transformation?.transformed_output || "Not generated yet."}</pre>
         </div>
       </div>
     </div>

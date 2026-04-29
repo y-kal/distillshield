@@ -13,31 +13,28 @@ DistillShield Local Run Guide
    npm install
    cd ../..
 
-4. Generate synthetic data and initialize the SQLite database
-   python scripts/generate_synthetic.py
+4. Generate synthetic scenario data and initialise the SQLite database
+   python scripts/generate_scenarios.py
 
-5. Train the baseline models
-   python scripts/train_baseline.py
-
-6. Start the backend API
+5. Start the backend API
    uvicorn distillshield_api.main:app --reload --host 0.0.0.0 --port 8000
 
-7. Start the frontend dashboard in a second terminal
+6. Start the frontend dashboard in a second terminal
    source .venv/bin/activate
    cd apps/web
    npm run dev -- --host 0.0.0.0 --port 5173
 
-8. Open the local research dashboard
+7. Open the local dashboard
    http://localhost:5173
 
-9. Run evaluation
+8. Run policy-effectiveness evaluation
    source .venv/bin/activate
    python scripts/evaluate.py
 
-10. Run tests
-    source .venv/bin/activate
-    pytest -q
+9. Run tests
+   source .venv/bin/activate
+   pytest -q
 
-11. Useful API endpoints
+10. Useful API endpoints
     http://localhost:8000/docs
     http://localhost:8000/health

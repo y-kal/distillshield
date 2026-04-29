@@ -1,3 +1,3 @@
-from .ensemble import DistillShieldEngine
+from .engine import DistillShieldEngine
 
 __all__ = ["DistillShieldEngine"]

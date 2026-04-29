@@ -140,9 +140,39 @@ pre {
   padding: 12px;
 }
 
+.query-block.compact {
+  padding: 10px 12px;
+}
+
 pre {
   white-space: pre-wrap;
   font-family: "Courier New", monospace;
+}
+
+.status-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+.status-banner.safe {
+  background: rgba(93, 143, 109, 0.14);
+}
+
+.status-banner.controlled {
+  background: rgba(171, 138, 75, 0.16);
+}
+
+.status-banner.elevated {
+  background: rgba(208, 128, 42, 0.16);
+}
+
+.status-banner.severe {
+  background: rgba(164, 76, 52, 0.16);
 }
 
 .error {

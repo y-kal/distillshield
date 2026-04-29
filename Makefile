@@ -6,7 +6,7 @@ UVICORN=$(VENV)/bin/uvicorn
 PYTEST=$(VENV)/bin/pytest
 NPM=npm
 
-.PHONY: venv install api web generate train evaluate test
+.PHONY: venv install api web generate evaluate test
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -23,10 +23,7 @@ web:
 	cd apps/web && $(NPM) run dev -- --host 0.0.0.0 --port 5173
 
 generate:
-	$(PYTHON_BIN) scripts/generate_synthetic.py
-
-train:
-	$(PYTHON_BIN) scripts/train_baseline.py
+	$(PYTHON_BIN) scripts/generate_scenarios.py
 
 evaluate:
 	$(PYTHON_BIN) scripts/evaluate.py

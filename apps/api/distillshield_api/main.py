@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import datetime
-import json
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -16,28 +13,23 @@ from distillshield_core.schemas import (
     EvaluateRequest,
     ExperimentSummary,
     IngestSessionRequest,
-    ModelSummary,
     PolicyDecisionResult,
     RiskAssessmentResult,
     SessionRecord,
     SimulationRequest,
-    TrainingRequest,
     TransformationResult,
 )
 from distillshield_eval.runner import EvaluationRunner
-from distillshield_feature_pipeline.pipeline import FeaturePipeline
 from distillshield_llm_adapter.transform import TransformationEngine
-from distillshield_models.ensemble import DistillShieldEngine
-from distillshield_models.ml import BaselineModelTrainer
+from distillshield_models import DistillShieldEngine
 from distillshield_models.policy import PolicyEngine
 from distillshield_storage.database import create_db_and_tables, get_session
-from distillshield_storage.models import ExperimentRunEntity, FeatureVectorEntity, ModelVersionEntity, SessionEntity, User
+from distillshield_storage.models import ExperimentRunEntity, FeatureVectorEntity, SessionEntity, User
 from distillshield_storage.repository import (
     get_session_bundle,
     list_sessions,
     save_experiment_run,
     save_feature_vector,
-    save_model_version,
     save_policy_decision,
     save_risk_assessment,
     save_transformation,
@@ -48,11 +40,9 @@ from distillshield_synthetic_data.generator import SyntheticDataGenerator
 
 settings = get_settings()
 synthetic_generator = SyntheticDataGenerator(seed=7)
-feature_pipeline = FeaturePipeline()
 engine = DistillShieldEngine()
 policy_engine = PolicyEngine()
 transformer = TransformationEngine()
-trainer = BaselineModelTrainer()
 evaluator = EvaluationRunner()
 
 
@@ -87,16 +77,6 @@ class TransformRequest(BaseModel):
     session: SessionRecord
     policy: str
     raw_output: str | None = None
-
-
-def _artifact_paths() -> dict[str, str]:
-    with get_session() as db:
-        rows = db.exec(select(ModelVersionEntity).order_by(ModelVersionEntity.created_at.desc())).all()
-        paths: dict[str, str] = {}
-        for row in rows:
-            if row.name not in paths:
-                paths[row.name] = row.artifact_path
-        return paths
 
 
 def _session_from_db(session_id: str) -> SessionRecord:
@@ -155,8 +135,15 @@ def _ensure_analysis(session: SessionRecord) -> None:
         if bundle["risk_assessment"] and bundle["policy_decision"] and bundle["transformation"]:
             return
 
-    assessment = engine.assess(session, artifact_paths=_artifact_paths())
-    decision = policy_engine.decide(session, assessment.predicted_class, assessment.risk_score, assessment.confidence)
+    assessment = engine.assess(session)
+    decision = policy_engine.decide(
+        session,
+        assessment.predicted_class,
+        assessment.risk_score,
+        assessment.confidence,
+        category_scores=assessment.category_scores,
+        triggered_rules=assessment.triggered_rules,
+    )
     transformed = transformer.transform(session, decision.chosen_policy)
     with get_session() as db:
         save_feature_vector(db, session.id, {item.name: item.model_dump() for item in assessment.feature_values})
@@ -198,7 +185,7 @@ def score_session(request: SessionIdRequest) -> RiskAssessmentResult:
         session = _session_from_db(request.session_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
-    assessment = engine.assess(session, artifact_paths=_artifact_paths())
+    assessment = engine.assess(session)
     with get_session() as db:
         save_feature_vector(db, session.id, {item.name: item.model_dump() for item in assessment.feature_values})
         save_risk_assessment(db, assessment)
@@ -229,30 +216,6 @@ def transform_output(request: TransformRequest) -> TransformationResult:
     with get_session() as db:
         save_transformation(db, result)
     return result
-
-
-@app.post("/train/baseline")
-def train_baseline(request: TrainingRequest) -> dict[str, Any]:
-    generator = SyntheticDataGenerator(seed=request.seed)
-    splits = generator.dataset_splits(num_users=request.num_users, sessions_per_user=request.sessions_per_user)
-    rows = [feature_pipeline.to_frame_row(session) for session in splits["train"]]
-    artifacts = trainer.train_all(rows, seed=request.seed)
-    with get_session() as db:
-        for artifact in artifacts:
-            if artifact.available:
-                save_model_version(db, artifact.name, "0.1.0", artifact.artifact_path, artifact.metrics)
-    return {
-        "trained_models": [
-            {
-                "name": artifact.name,
-                "available": artifact.available,
-                "artifact_path": artifact.artifact_path,
-                "metrics": artifact.metrics,
-                "feature_importance": artifact.feature_importance,
-            }
-            for artifact in artifacts
-        ]
-    }
 
 
 @app.post("/evaluate")
@@ -327,8 +290,12 @@ def get_session_detail(session_id: str) -> dict[str, Any]:
             "risk_score": bundle["risk_assessment"].risk_score,
             "predicted_class": bundle["risk_assessment"].predicted_class,
             "confidence": bundle["risk_assessment"].confidence,
+            "explainability": bundle["risk_assessment"].explainability,
+            "category_scores": bundle["risk_assessment"].category_scores,
+            "top_reasons": bundle["risk_assessment"].top_reasons,
+            "triggered_rules": bundle["risk_assessment"].triggered_rules,
+            "risk_reducers": bundle["risk_assessment"].risk_reducers,
             "reasons": bundle["risk_assessment"].reasons,
-            "model_contributions": bundle["risk_assessment"].model_contributions,
         } if bundle["risk_assessment"] else None,
         "policy_decision": {
             "chosen_policy": bundle["policy_decision"].chosen_policy,
@@ -360,19 +327,6 @@ def get_users() -> list[dict[str, Any]]:
     with get_session() as db:
         users = db.exec(select(User)).all()
     return [{"id": user.id, "label": user.label, "created_at": user.created_at, "metadata": user.user_metadata} for user in users]
-
-
-@app.get("/models", response_model=list[ModelSummary])
-def get_models() -> list[ModelSummary]:
-    with get_session() as db:
-        rows = db.exec(select(ModelVersionEntity).order_by(ModelVersionEntity.created_at.desc())).all()
-    latest: dict[str, ModelVersionEntity] = {}
-    for row in rows:
-        latest.setdefault(row.name, row)
-    return [
-        ModelSummary(name=name, available=True, version=row.version, metrics=row.metrics)
-        for name, row in latest.items()
-    ]
 
 
 @app.get("/features/{session_id}")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Iterable
 
 from sqlmodel import Session, select
@@ -16,7 +16,6 @@ from .models import (
     APIContextEntity,
     ExperimentRunEntity,
     FeatureVectorEntity,
-    ModelVersionEntity,
     PolicyDecisionEntity,
     QueryEntity,
     ResponseEntity,
@@ -92,7 +91,7 @@ def upsert_session(session: Session, record: SessionRecord) -> None:
 
 
 def save_feature_vector(session: Session, session_id: str, feature_payload: dict) -> None:
-    session.add(FeatureVectorEntity(session_id=session_id, feature_payload=feature_payload, created_at=datetime.utcnow()))
+    session.add(FeatureVectorEntity(session_id=session_id, feature_payload=feature_payload, created_at=datetime.now(UTC)))
     session.commit()
 
 
@@ -103,9 +102,13 @@ def save_risk_assessment(session: Session, assessment: RiskAssessmentResult) -> 
             risk_score=assessment.risk_score,
             predicted_class=assessment.predicted_class.value,
             confidence=assessment.confidence,
+            explainability=assessment.explainability.model_dump(mode="json"),
+            category_scores=assessment.category_scores,
+            top_reasons=assessment.top_reasons,
+            triggered_rules=[rule.model_dump() for rule in assessment.triggered_rules],
+            risk_reducers=assessment.risk_reducers,
             reasons=[reason.model_dump() for reason in assessment.reasons],
-            model_contributions=assessment.model_contributions,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
     )
     session.commit()
@@ -119,7 +122,7 @@ def save_policy_decision(session: Session, decision: PolicyDecisionResult) -> No
             policy_reason=decision.policy_reason,
             override_applied=decision.override_applied,
             thresholds=decision.thresholds,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
     )
     session.commit()
@@ -134,7 +137,7 @@ def save_transformation(session: Session, transformation: TransformationResult) 
             transformed_output=transformation.transformed_output,
             leakage_proxy_score=transformation.leakage_proxy_score,
             leakage_factors=transformation.leakage_factors,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
     )
     session.commit()
@@ -144,23 +147,10 @@ def save_experiment_run(session: Session, experiment_id: str, metrics: dict, art
     session.add(
         ExperimentRunEntity(
             id=experiment_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             metrics=metrics,
             artifact_paths=artifact_paths,
             notes=notes,
-        )
-    )
-    session.commit()
-
-
-def save_model_version(session: Session, name: str, version: str, artifact_path: str, metrics: dict) -> None:
-    session.add(
-        ModelVersionEntity(
-            name=name,
-            version=version,
-            artifact_path=artifact_path,
-            metrics=metrics,
-            created_at=datetime.utcnow(),
         )
     )
     session.commit()

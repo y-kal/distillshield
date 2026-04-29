@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import ipaddress
 import random
 from statistics import mean
@@ -94,13 +94,12 @@ class SyntheticDataGenerator:
                 sessions.append(self._generate_session(user_idx, session_idx, behavior_class))
         return sessions
 
-    def dataset_splits(self, num_users: int = 20, sessions_per_user: int = 3) -> dict[str, list[SessionRecord]]:
+    def scenario_batches(self, num_users: int = 20, sessions_per_user: int = 3) -> dict[str, list[SessionRecord]]:
         sessions = self.generate_sessions(num_users=num_users, sessions_per_user=sessions_per_user)
-        self.rng.shuffle(sessions)
-        total = len(sessions)
-        train_end = int(total * 0.7)
-        val_end = int(total * 0.85)
-        return {"train": sessions[:train_end], "validation": sessions[train_end:val_end], "test": sessions[val_end:]}
+        grouped: dict[str, list[SessionRecord]] = defaultdict(list)
+        for session in sessions:
+            grouped[session.label.value if session.label else "unknown"].append(session)
+        return dict(grouped)
 
     def class_distribution(self, sessions: list[SessionRecord]) -> dict[str, int]:
         counts = defaultdict(int)
@@ -112,7 +111,7 @@ class SyntheticDataGenerator:
         profile = PROFILES[behavior_class]
         user_id = f"user-{behavior_class.value}-{user_idx}"
         session_id = str(uuid4())
-        base_time = datetime.utcnow() - timedelta(days=self.rng.randint(1, 60), hours=self.rng.randint(0, 23))
+        base_time = datetime.now(UTC) - timedelta(days=self.rng.randint(1, 60), hours=self.rng.randint(0, 23))
         query_count = self.rng.randint(4, 10) + (2 if behavior_class in {BehaviorClass.SUSPICIOUS, BehaviorClass.HIGH_THREAT} else 0)
         topics = self._choose_topics(query_count, profile)
 
@@ -163,7 +162,8 @@ class SyntheticDataGenerator:
             label=behavior_class,
             metadata={
                 "synthetic_seed": self.seed,
-                "behavior_profile": behavior_class.value,
+                "behaviour_profile": behavior_class.value,
+                "scenario_source": "synthetic demo scenario",
                 "avg_completion_tokens": mean([response.completion_tokens for response in responses]),
             },
         )
