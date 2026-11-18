@@ -40,7 +40,7 @@ Repository layout:
 8. `uvicorn distillshield_api.main:app --reload --host 0.0.0.0 --port 8000`
 9. `cd apps/web && npm run dev -- --host 0.0.0.0 --port 5173`
 
-The same commands are listed in [RUN_INSTRUCTIONS.txt](/home/ykal/College/cf_ds/RUN_INSTRUCTIONS.txt).
+The same commands are listed in [RUN_INSTRUCTIONS.txt](RUN_INSTRUCTIONS.txt).
 
 ## Makefile Shortcuts
 - `make install`
@@ -117,112 +117,26 @@ Mocked or heuristic:
 The system is rules-only. It does not train an LLM or baseline ML classifiers.
 
 ## Limitations
-This is a research prototype. It demonstrates feasibility mechanics, not production-grade abuse detection or proven resistance against real model distillation. See [docs/limitations.md](/home/ykal/College/cf_ds/docs/limitations.md).
+This is a research prototype. It demonstrates feasibility mechanics, not production-grade abuse detection or proven resistance against real model distillation. See [docs/limitations.md](docs/limitations.md).
 
-##RESULTS
+## Evaluation
 
-# Results
+`python scripts/evaluate.py` runs the policy-effectiveness evaluation over reproducible synthetic scenarios and writes JSON artefacts under `data/experiments`. The numbers below come from that script with its default configuration (seed 11, 40 users x 3 sessions = 120 sessions). Because the dataset is synthetic and the teacher is a deterministic mock, these metrics describe pipeline behaviour, not proven protection against real model distillation.
 
-## 5.1 Classification Performance
+Representative run:
 
-Although DistillShield is a rule-based system, we evaluate its ability to correctly classify user behavior into predefined categories.
+| Metric | Value | What it means |
+| --- | --- | --- |
+| False block rate - normal sessions | 0% | No normal session was blocked |
+| False block rate - laboratory legitimate | 0% | No legitimate research session was blocked |
+| Adaptive degradation rate - high-risk sessions | 78.3% | Share of suspicious and high-threat sessions whose output was compressed, rewritten, reduced to answer-only, or blocked |
+| Explainability reason coverage | 100% | Sessions returning category scores plus at least one top reason |
+| Utility preservation proxy (mean) | 0.89 | Fixed per-policy utility weights averaged over the chosen policies |
+| Leakage proxy reduction (mean, absolute) | 0.06 | Mean drop in the heuristic leakage score after transformation |
 
-| Metric        | Value |
-|--------------|------|
-| Accuracy      | 91.3% |
-| Precision     | 89.7% |
-| Recall        | 90.5% |
-| F1-score      | 90.1% |
+Threshold sanity check: the mean risk score was 0.16 for normal sessions and 0.65 for high-threat sessions, so scores rise with the engineered threat level.
 
-### Confusion Matrix
-
-|                | Pred Normal | Pred Suspicious | Pred High Threat |
-|----------------|------------|----------------|------------------|
-| True Normal    | 120        | 8              | 2                |
-| True Suspicious| 10         | 95             | 15               |
-| True Threat    | 3          | 12             | 110              |
-
----
-
-## 5.2 Leakage Reduction
-
-The primary objective of DistillShield is to reduce reasoning leakage.
-
-| Setting              | Leakage Proxy |
-|----------------------|--------------|
-| No Protection        | 0.42         |
-| With DistillShield   | 0.21         |
-
-**Leakage Reduction:** 50%
-
----
-
-## 5.3 Utility Preservation
-
-It is critical that protection does not significantly degrade output quality.
-
-| Metric                  | Value |
-|--------------------------|------|
-| Utility (baseline)       | 1.00 |
-| Utility (protected)      | 0.91 |
-| Utility Loss             | 9%   |
-
----
-
-## 5.4 False Blocking Rate
-
-We evaluate how often legitimate users are incorrectly restricted.
-
-| Scenario Type            | Block Rate |
-|--------------------------|-----------|
-| Normal Users             | 2.1%      |
-| Legitimate Research      | 4.3%      |
-| High Threat Users        | 78%       |
-
----
-
-## 5.5 Policy Adaptation Effectiveness
-
-The system dynamically adjusts output exposure based on behavioral risk.
-
-| User Type     | Expected Policy        | Correct Assignment (%) |
-|--------------|----------------------|------------------------|
-| Normal        | full_reasoning        | 93%                    |
-| Suspicious    | compressed_reasoning  | 88%                    |
-| High Threat   | answer_only / block   | 91%                    |
-
----
-
-## 5.6 Risk Score Calibration
-
-Risk scores increase consistently with behavioral threat levels, indicating good calibration of the rule-based scoring system.
-
-- Low-risk users → Low scores (~0.1–0.3)
-- Suspicious users → միջ scores (~0.4–0.7)
-- High-threat users → High scores (~0.7–1.0)
-
-This demonstrates that the scoring mechanism aligns with expected behavioral categories.
-
----
-
-## 5.7 Explainability Analysis
-
-DistillShield provides interpretable outputs through rule-based reasoning.
-
-| Metric                          | Value |
-|--------------------------------|------|
-| Avg reasons per decision       | 3.2  |
-| Explainable decisions (%)      | 100% |
-| Rule coverage                  | 87%  |
-
-Each decision includes:
-- Triggered rules
-- Top contributing factors
-- Risk reducers
-
----
-
-## 5.8 Case Study
-
-### Example: Low-Risk Session
-
+Interpretation limits:
+- Utility values are fixed weights per policy, not a measured answer-quality score.
+- The leakage proxy is a stylistic heuristic scored against deterministic mock teacher output.
+- The rules are hand-tuned to the synthetic data generator, so agreement between predicted classes and synthetic labels is not evidence of real-world detection accuracy.
